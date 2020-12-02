@@ -526,7 +526,7 @@ BEGIN
 MUS_INS('DOLBY');
 END;
 BEGIN
-MUS_INS('NVAK FOUNDA�TION');
+MUS_INS('NVAK FOUNDA­TION');
 END;
 BEGIN
 MUS_INS('GENER8TOR');
@@ -748,3 +748,225 @@ FROM SALES S
 JOIN CLIENT C ON C.ID = S.ID_CLIENT 
 WHERE S.DATA >= TO_DATE('1/1/2006', 'MM/DD/YYYY') AND s.data <= TO_DATE('12/12/2006', 'MM/DD/YYYY') 
 ORDER BY S.DATA;
+
+/*========WITH CONTROLLERS=======*/
+/* Търсене на CD, DVD по вид, изпълнител, жанр, година, музикална компания */
+
+create or replace PROCEDURE SEARCH_PRODUCT(TYPE_P VARCHAR2, ARTIST_P VARCHAR2, GENRE_P VARCHAR2, YEAR_P VARCHAR2, MUSIC_COMPANY_P VARCHAR2) 
+IS   
+CURSOR SEARCH_CURSOR 
+IS
+    SELECT C.NAME, S.DATA, T.TYPE, P.NAME, A.NAME, G.GENRE, M.NAME, CT.QUANTITY, P.PRICE 
+    FROM CART CT 
+    JOIN SALES S ON S.ID=CT.ID_SALES 
+    JOIN CLIENT C ON C.ID = S.ID_CLIENT 
+    JOIN PRODUCT P ON P.ID=CT.ID_PRODUCT 
+    JOIN TYPE T ON T.ID = P.ID_TYPE 
+    JOIN ARTIST A ON A.ID=P.ID_ARTIST 
+    JOIN GENRE G ON G.ID=P.ID_GENRE 
+    JOIN MUSIC_COMPANY M ON M.ID=P.ID_MUSIC_COMPANY 
+    WHERE T.type = TYPE_P 
+    OR a.name = ARTIST_P 
+    OR G.GENRE = GENRE_P 
+    OR p.YEAR = YEAR_P 
+    OR m.name = MUSIC_COMPANY_P;
+
+    CL_NAME client.name%TYPE;
+    SALE_DATA DATE;
+    T_TYPE type.type%TYPE;
+    PROD_NAME product.name%TYPE;
+    ARTIST_NAME artist.name%TYPE;
+    G_GENRE genre.genre%TYPE;
+    COMPANY_NAME music_company.name%TYPE;
+    CART_QUAN NUMBER;
+    PROD_PRICE NUMBER;
+    
+    BEGIN
+    OPEN SEARCH_CURSOR;
+    LOOP FETCH SEARCH_CURSOR INTO CL_NAME, SALE_DATA, T_TYPE, PROD_NAME, ARTIST_NAME, G_GENRE, COMPANY_NAME, CART_QUAN, PROD_PRICE;
+    EXIT WHEN SEARCH_CURSOR%NOTFOUND;
+    DBMS_OUTPUT.PUT_LINE(
+     'CLIENT NAME:' || CL_NAME || 
+    ' SALE_DATE:' || SALE_DATA ||
+    ' TYPE:' || T_TYPE ||
+    ' PRODUCT NAME:' || PROD_NAME ||
+    ' ARTIST NAME:' || ARTIST_NAME ||
+    ' GANRE:' || G_GENRE ||
+    ' MUSIC COMPANY NAME:' || COMPANY_NAME ||
+    ' QUANTITY:' || CART_QUAN ||
+    ' PRICE:' || PROD_PRICE || '$');
+    END LOOP;
+  CLOSE SEARCH_CURSOR;
+END SEARCH_PRODUCT;
+EXEC SEARCH_PRODUCT('&Type' ,'&Artist_Name' ,'&Genre' ,'&Year' ,'&Music_Company');
+
+/*Справка за Продажби на служител, подредени по дата*/
+
+create or replace PROCEDURE EMPLOYEE_SALES(EM_NAME VARCHAR2) 
+IS   
+CURSOR EM_SALES_CURSOR 
+IS
+    SELECT cl.name, e.name, s.data, t.type, p.name, c.quantity, p.price
+    FROM employee e 
+    JOIN sales s ON e.id = s.id_employee 
+    JOIN client cl ON cl.id=s.id_client JOIN cart c ON c.id_sales = s.id 
+    JOIN product p ON p.id = c.id_product 
+    JOIN type t ON t.id = p.id_type 
+    WHERE e.name = EM_NAME ORDER BY s.data;
+
+    CL_NAME client.name%TYPE;
+    EM_NAME_P employee.name%TYPE;
+    SALE_DATA DATE;
+    T_TYPE type.type%TYPE;
+    PROD_NAME product.name%TYPE;
+    CART_QUAN NUMBER;
+    PROD_PRICE NUMBER;
+
+    BEGIN
+    OPEN EM_SALES_CURSOR;
+    LOOP FETCH EM_SALES_CURSOR INTO CL_NAME, EM_NAME_P, SALE_DATA, T_TYPE, PROD_NAME, CART_QUAN, PROD_PRICE;
+    EXIT WHEN EM_SALES_CURSOR%NOTFOUND;
+    DBMS_OUTPUT.PUT_LINE(
+     'CLIENT NAME:' || CL_NAME || 
+    ' EMPLOYEE NAME:' || EM_NAME_P ||
+    ' SALE_DATE:' || SALE_DATA ||
+    ' TYPE:' || T_TYPE ||
+    ' PRODUCT NAME:' || PROD_NAME ||
+    ' QUANTITY:' || CART_QUAN ||
+    ' PRICE:' || PROD_PRICE || '$');
+    END LOOP;
+  CLOSE EM_SALES_CURSOR;
+END EMPLOYEE_SALES;
+EXEC EMPLOYEE_SALES('&Employee_name');
+
+/*Справка за Последните 5 продажби на стоки, издавани в последната година, подредени по служител*/
+
+create or replace PROCEDURE LAST_SALES 
+IS   
+CURSOR LAST_SALES_CURSOR 
+IS
+    SELECT * FROM 
+    (SELECT t.type, p.name, g.genre, c.quantity, p.price
+    FROM client cl 
+    JOIN sales s ON cl.id = s.id_client 
+    JOIN cart c ON s.id = c.id_sales 
+    JOIN employee e ON e.id = s.id_employee 
+    JOIN product p ON p.id = c.id_product 
+    JOIN type t ON t.id = p.id_type 
+    JOIN genre g ON g.id = p.id_genre 
+    WHERE (s.data BETWEEN TRUNC(sysdate, 'Year') AND sysdate) 
+    ORDER BY s.data, e.name DESC) 
+    WHERE ROWNUM <=5;
+
+    T_TYPE type.type%TYPE;
+    PROD_NAME product.name%TYPE;
+    G_GANRE genre.genre%TYPE;
+    CART_QUAN NUMBER;
+    PROD_PRICE NUMBER;
+    
+    BEGIN
+    OPEN LAST_SALES_CURSOR;
+    LOOP FETCH LAST_SALES_CURSOR INTO T_TYPE, PROD_NAME, G_GANRE, CART_QUAN, PROD_PRICE;
+    EXIT WHEN LAST_SALES_CURSOR%NOTFOUND;
+    DBMS_OUTPUT.PUT_LINE(
+    'TYPE:' || T_TYPE ||
+    ' PRODUCT NAME:' || PROD_NAME ||
+    ' GANRE:' || G_GANRE ||
+    ' QUANTITY:' || CART_QUAN ||
+    ' PRICE:' || PROD_PRICE || '$');
+    END LOOP;
+  CLOSE LAST_SALES_CURSOR;
+END LAST_SALES;
+EXEC LAST_SALES;  
+
+/*Справка за Закупени стоки от клиент, подредени по вид и дата*/
+ 
+create or replace PROCEDURE CLIENT_PRODUCT(CLIENT_NAME VARCHAR2) 
+IS   
+CURSOR CLIENT_PRODUCT_CURSOR 
+IS
+    SELECT cl.name, t.type, p.name, a.name, g.genre, m.name, c.quantity, p.price 
+    FROM client cl 
+    JOIN sales s ON cl.id = s.id_client 
+    JOIN cart c ON s.id = c.id_sales 
+    JOIN product p ON p.id = c.id_product 
+    JOIN type t ON t.id = p.id_type 
+    JOIN artist a ON a.id = p.id_artist 
+    JOIN genre g ON g.id = p.id_genre 
+    JOIN music_company m ON m.id=p.id_music_company 
+    WHERE cl.name = CLIENT_NAME
+    ORDER BY t.type, p.year;
+    
+    CL_NAME client.name%TYPE;
+    T_TYPE type.type%TYPE;
+    PROD_NAME product.name%TYPE;
+    ARTIST_NAME artist.name%TYPE;
+    G_GANRE genre.genre%TYPE;
+    COMPANY_NAME music_company.name%TYPE;
+    CART_QUAN NUMBER;
+    PROD_PRICE NUMBER;
+    
+    BEGIN
+    OPEN CLIENT_PRODUCT_CURSOR;
+    LOOP FETCH CLIENT_PRODUCT_CURSOR INTO CL_NAME, T_TYPE, PROD_NAME, ARTIST_NAME, G_GANRE, COMPANY_NAME, CART_QUAN, PROD_PRICE;
+    EXIT WHEN CLIENT_PRODUCT_CURSOR%NOTFOUND;
+    DBMS_OUTPUT.PUT_LINE(
+     'CLIENT NAME:' || CL_NAME || 
+    ' TYPE:' || T_TYPE ||
+    ' PRODUCT NAME:' || PROD_NAME ||
+    ' ARTIST NAME:' || ARTIST_NAME ||
+    ' GANRE:' || G_GANRE ||
+    ' MUSIC COMPANY NAME:' || COMPANY_NAME ||
+    ' QUANTITY:' || CART_QUAN ||
+    ' PRICE:' || PROD_PRICE || '$');
+    END LOOP;
+  CLOSE CLIENT_PRODUCT_CURSOR;
+END CLIENT_PRODUCT;
+EXEC CLIENT_PRODUCT('&Client_Name'); 
+
+/*Справка за Закупени стоки за период, подредени по клиенти и дати*/
+
+create or replace PROCEDURE PERIODE_SALES 
+IS   
+CURSOR PERIODE_SALES_CURSOR 
+IS
+    SELECT C.NAME, S.DATA, T.TYPE, P.NAME, A.NAME, G.GENRE, M.NAME, CT.QUANTITY, p.price 
+    FROM CART CT 
+    JOIN SALES S ON S.ID=CT.ID_SALES 
+    JOIN CLIENT C ON C.ID = S.ID_CLIENT 
+    JOIN PRODUCT P ON P.ID=CT.ID_PRODUCT 
+    JOIN TYPE T ON T.ID = P.ID_TYPE 
+    JOIN ARTIST A ON A.ID=P.ID_ARTIST 
+    JOIN GENRE G ON G.ID=P.ID_GENRE 
+    JOIN MUSIC_COMPANY M ON M.ID=P.ID_MUSIC_COMPANY 
+    WHERE S.DATA >= TO_DATE('1/1/2020', 'DD/MM/YYYY') 
+    AND s.data <= TO_DATE('30/12/2020', 'DD/MM/YYYY') 
+    ORDER BY C.NAME, S.DATA;
+
+    CL_NAME client.name%TYPE;
+    SALE_DATA DATE;
+    T_TYPE type.type%TYPE;
+    PROD_NAME product.name%TYPE;
+    ARTIST_NAME artist.name%TYPE;
+    G_GANRE genre.genre%TYPE;
+    COMPANY_NAME music_company.name%TYPE;
+    CART_QUAN NUMBER;
+    PROD_PRICE NUMBER;
+    
+    BEGIN
+    OPEN PERIODE_SALES_CURSOR;
+    LOOP FETCH PERIODE_SALES_CURSOR INTO CL_NAME, SALE_DATA, T_TYPE, PROD_NAME, ARTIST_NAME, G_GANRE, COMPANY_NAME, CART_QUAN, PROD_PRICE;
+    EXIT WHEN PERIODE_SALES_CURSOR%NOTFOUND;
+    DBMS_OUTPUT.PUT_LINE(
+     'CLIENT NAME:' || CL_NAME || 
+    ' SALE_DATE:' || SALE_DATA ||
+    ' TYPE:' || T_TYPE ||
+    ' PRODUCT NAME:' || PROD_NAME ||
+    ' ARTIST NAME:' || ARTIST_NAME ||
+    ' GANRE:' || G_GANRE ||
+    ' MUSIC COMPANY NAME:' || COMPANY_NAME ||
+    ' QUANTITY:' || CART_QUAN ||
+    ' PRICE:' || PROD_PRICE || '$');
+    END LOOP;
+  CLOSE PERIODE_SALES_CURSOR;
+END PERIODE_SALES;
